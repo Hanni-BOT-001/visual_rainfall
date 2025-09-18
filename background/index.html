@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Organic Background Combined Demo</title>
+  <style>
+    :root{--g1:220 84% 58%;--g2:260 78% 48%;--g3:190 72% 55%;}
+    html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    .background{position:fixed;inset:0;z-index:-1;background:radial-gradient(60% 40% at 10% 20%, hsla(var(--g1)/0.85), transparent 40%),radial-gradient(50% 60% at 90% 80%, hsla(var(--g2)/0.9), transparent 45%),conic-gradient(from 210deg at 50% 50%, hsla(var(--g3)/0.7), transparent 60%);background-blend-mode:screen;filter:blur(30px) saturate(1.05);transform:translateZ(0);will-change:transform,opacity;animation:drift 30s linear infinite;pointer-events:none;opacity:0.95}
+    @keyframes drift{0%{transform:translate3d(0,0,0) scale(1) rotate(0deg)}50%{transform:translate3d(-6%,4%,0) scale(1.02) rotate(.3deg)}100%{transform:translate3d(0,0,0) scale(1) rotate(0deg)}}
+    @media (prefers-reduced-motion:reduce){.background{animation:none}}
+
+    .card{position:relative;max-width:980px;margin:48px auto;padding:28px;border-radius:12px;background:rgba(10,10,12,0.56);backdrop-filter:blur(6px);color:#fff}
+    .controls{display:flex;gap:12px;margin-top:12px}
+    button{padding:8px 12px;border-radius:8px;border:0;background:#ffffff20;color:#fff}
+    .note{opacity:0.85;font-size:13px;margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="background" id="cssBg"></div>
+  <div class="card">
+    <h1>Organic Background Combined Demo</h1>
+    <p>This page loads the CSS layered-gradient background and the canvas-based organic background together. Use the controls to toggle each layer and experiment with the visual mix.</p>
+    <div class="controls">
+      <button id="toggleCss">Toggle CSS Background</button>
+      <button id="toggleCanvas">Toggle Canvas Background</button>
+      <button id="pulse">Pulse</button>
+    </div>
+    <div class="note">Tip: The canvas demo auto-appends a full-viewport canvas (GPU-friendly). Use <code>prefers-reduced-motion</code> or the toggle to reduce motion.</div>
+  </div>
+
+  <script>
+    const cssBg = document.getElementById('cssBg');
+    const toggleCss = document.getElementById('toggleCss');
+    const toggleCanvas = document.getElementById('toggleCanvas');
+    const pulseBtn = document.getElementById('pulse');
+    let cssOn = true;
+    let canvasOn = true;
+
+    toggleCss.addEventListener('click', ()=>{
+      cssOn = !cssOn; cssBg.style.display = cssOn ? 'block' : 'none';
+    });
+
+    toggleCanvas.addEventListener('click', ()=>{
+      canvasOn = !canvasOn;
+      if(window.__backgroundCanvas){ if(canvasOn) window.__backgroundCanvas.start(); else window.__backgroundCanvas.stop(); }
+    });
+
+    pulseBtn.addEventListener('click', ()=>{
+      cssBg.animate([{filter:'blur(30px) brightness(1.08)'},{filter:'blur(30px) brightness(1)'}],{duration:350,fill:'forwards'});
+      if(window.__backgroundCanvas){ /* optionally trigger a visual pulse via canvas controls */ }
+    });
+
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ if(window.__backgroundCanvas) window.__backgroundCanvas.stop(); } else { if(window.__backgroundCanvas && canvasOn) window.__backgroundCanvas.start(); } })
+  </script>
+
+  <!-- Load the canvas demo (it appends its own canvas) -->
+  <script src="background-canvas.js"></script>
+</body>
+</html>
