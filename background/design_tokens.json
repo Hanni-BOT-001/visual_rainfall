@@ -1,0 +1,30 @@
+{
+  "tokens": {
+    "driftDuration": 30,
+    "driftCycleSeconds": 30,
+    "microWarpAmplitude": 0.015,
+    "microWarpFrequency": 0.8,
+    "parallaxSpeeds": [0.5, 1.0, 1.5],
+    "pulseDurationMs": 350,
+    "reducedMotion": true,
+    "defaultMode": "dark",
+
+    "palettes": {
+      "calm_morning": [
+        "#3b2f63",
+        "#58a6a6",
+        "#ffd8b1"
+      ],
+      "tech_dusk": [
+        "#1b0033",
+        "#0033ff",
+        "#ff00aa"
+      ],
+      "neutral": [
+        "#39424e",
+        "#9aa6b2",
+        "#cfe6f5"
+      ]
+    }
+  }
+}

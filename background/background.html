@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Background Demo</title>
+  <style>
+    :root{--g1:220 84% 58%;--g2:260 78% 48%;--g3:190 72% 55%;}
+    html,body{height:100%;margin:0}
+    .background{
+      position:fixed;inset:0;z-index:-1;
+      background:
+        radial-gradient(60% 40% at 10% 20%, hsla(var(--g1)/0.85), transparent 40%),
+        radial-gradient(50% 60% at 90% 80%, hsla(var(--g2)/0.9), transparent 45%),
+        conic-gradient(from 210deg at 50% 50%, hsla(var(--g3)/0.7), transparent 60%);
+      background-blend-mode: screen;
+      filter: blur(30px) saturate(1.05);
+      transform: translateZ(0);
+      will-change: transform, opacity;
+      animation: drift 30s linear infinite;
+      pointer-events:none;opacity:0.95
+    }
+    @keyframes drift{
+      0%{transform:translate3d(0,0,0) scale(1) rotate(0deg)}
+      50%{transform:translate3d(-6%,4%,0) scale(1.02) rotate(.3deg)}
+      100%{transform:translate3d(0,0,0) scale(1) rotate(0deg)}
+    }
+    @media (prefers-reduced-motion:reduce){.background{animation:none}}
+
+    .card{position:relative;max-width:760px;margin:40px auto;padding:28px;border-radius:12px;background:rgba(10,10,12,0.6);backdrop-filter:blur(6px);color:#fff}
+    .controls{display:flex;gap:12px;margin-top:12px}
+    button{padding:8px 12px;border-radius:8px;border:0;background:#ffffff20;color:#fff}
+  </style>
+</head>
+<body>
+  <div class="background" id="bg"></div>
+  <div class="card">
+    <h1>Organic Background Demo</h1>
+    <p>This demo shows a layered CSS-only organic background. For richer warping, see the canvas example.</p>
+    <div class="controls">
+      <button id="toggleAnim">Toggle Animation</button>
+      <button id="pulse">Pulse</button>
+    </div>
+  </div>
+  <script>
+    const bg = document.getElementById('bg');
+    const toggle = document.getElementById('toggleAnim');
+    const pulseBtn = document.getElementById('pulse');
+    let running = true;
+    toggle.addEventListener('click', ()=>{
+      running = !running; bg.style.animation = running ? 'drift 30s linear infinite' : 'none';
+    });
+    pulseBtn.addEventListener('click', ()=>{
+      bg.animate([{filter:'blur(30px) brightness(1.08)'},{filter:'blur(30px) brightness(1)'}],{duration:350,fill:'forwards'})
+    })
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden){bg.style.animation='none'} else if(running){bg.style.animation='drift 30s linear infinite'} })
+  </script>
+</body>
+</html>

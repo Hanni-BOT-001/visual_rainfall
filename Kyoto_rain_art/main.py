@@ -1,90 +1,142 @@
+import os
+import textwrap
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-import matplotlib.colors as mcolors
-import os
-
-# Load weather data
-csv_path = 'Kyotorain.csv'
-if not os.path.isfile(csv_path):
-    print(f"Error: Data file '{csv_path}' not found in the current directory.")
-    print("Please make sure the file exists and try again.")
-    exit(1)
-try:
-    # Find the line number where the main weather data starts
-    with open(csv_path, encoding='utf-8') as f:
-        lines = f.readlines()
-    for i, line in enumerate(lines):
-        if line.strip().startswith('time,temperature_2m'):
-            data_start = i
-            break
-    df = pd.read_csv(csv_path, skiprows=data_start)
-except Exception as e:
-    print(f"Error loading CSV file: {e}")
-    exit(1)
+import pandas as pd
 
 
-# Clean and parse data
-# Use all columns from the weather data block
-expected_cols = ['time','temperature_2m (°C)','dew_point_2m (°C)','relative_humidity_2m (%)','rain (mm)','wind_speed_10m (km/h)','wind_direction_10m (°)','surface_pressure (hPa)','cloud_cover_low (%)']
-df = df[expected_cols].dropna()
-df['time'] = pd.to_datetime(df['time'])
+def main():
+    """Run the ripple rainfall animation. Reads 'kyotov03.csv' if available."""
+    # parameters
+    N_RIPPLES = 12
+    MAX_RADIUS = 100
+    FADE_RATE = 0.03
+
+    KYOTO_LAT = 35.0116
+    KYOTO_LON = 135.7681
+
+    # load data with fallback
+    def synthetic(frames=300):
+        rng = np.random.default_rng(12345)
+        return dict(
+            frames=frames,
+            rainfall=np.abs(rng.normal(5, 10, frames)),
+            wind_dir=rng.uniform(0, 360, frames),
+            humidity=np.clip(rng.normal(70, 10, frames), 0, 100),
+            temperature=rng.normal(15, 5, frames),
+        )
+
+    def load(csv_path='kyotov03.csv'):
+        if os.path.isfile(csv_path):
+            try:
+                df = pd.read_csv(csv_path, skiprows=11)
+            except Exception:
+                return synthetic()
+            # try to find expected cols
+            def find(cols):
+                for c in cols:
+                    if c in df.columns:
+                        return c
+                return None
+
+            rcol = find(['rain (mm)', 'rain_mm', 'rain'])
+            wcol = find(['wind_direction_10m (°)', 'wind_direction_10m', 'wind_direction', 'wind_dir'])
+            rhcol = find(['relative_humidity_2m (%)', 'relative_humidity_2m', 'humidity'])
+            tcol = find(['temperature_2m (°C)', 'temperature_2m', 'temperature', 'temp'])
+
+            if rcol and wcol:
+                rainfall = df[rcol].fillna(0).astype(float).values
+                wind_dir = df[wcol].fillna(0).astype(float).values
+                humidity = df[rhcol].fillna(0).astype(float).values if rhcol else np.zeros(len(df))
+                temperature = df[tcol].fillna(0).astype(float).values if tcol else np.zeros(len(df))
+                return dict(frames=len(df), rainfall=rainfall, wind_dir=wind_dir,
+                            humidity=humidity, temperature=temperature)
+        return synthetic()
+
+    data = load('kyotov03.csv')
+    frames = data['frames']
+    rainfall = data['rainfall']
+    wind_dir = data['wind_dir']
+    humidity = data['humidity']
+    temperature = data['temperature']
+
+    # figure
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.set_xlim(0, 200)
+    ax.set_ylim(0, 200)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_facecolor('midnightblue')
+
+    rng = np.random.default_rng(1)
+    for _ in range(30):
+        cx = rng.uniform(20, 180)
+        cy = rng.uniform(20, 180)
+        cr = rng.uniform(10, 30)
+        cloud = plt.Circle((cx, cy), cr, color='white', alpha=rng.uniform(0.10, 0.30), lw=0, fill=True)
+        ax.add_patch(cloud)
+
+    info_text = ax.text(1.0, 0.02, '', color='white', fontsize=12,
+                        ha='right', va='bottom', transform=ax.transAxes,
+                        bbox=dict(facecolor='black', boxstyle='round,pad=0.5', alpha=0.5))
+
+    ripples = []
+    ripple_artists = []
+
+    def spawn_ripple(frame_idx):
+        rain = float(rainfall[frame_idx % frames])
+        wind_angle = np.deg2rad(float(wind_dir[frame_idx % frames]))
+        base_x, base_y = 100, 100
+        offset = np.random.uniform(10, 60)
+        x = base_x + offset * np.cos(wind_angle)
+        y = base_y + offset * np.sin(wind_angle)
+        color_val = min(1.0, rain / 30.0)
+        color = plt.cm.rainbow(color_val)
+        new_ripple = {'x': x, 'y': y, 'radius': 0.0, 'alpha': 1.0, 'color': color, 'angle': wind_angle}
+        artist = plt.Circle((x, y), 0.0, edgecolor=color, facecolor='none', alpha=1.0, lw=2)
+        ripples.append(new_ripple)
+        ripple_artists.append(artist)
+        ax.add_patch(artist)
+
+    def animate(frame_idx):
+        info_text.set_text(textwrap.dedent(f"""
+            Kyoto ({KYOTO_LAT:.4f}, {KYOTO_LON:.4f})
+            Rainfall: {rainfall[frame_idx % frames]:.1f} mm
+            Humidity: {humidity[frame_idx % frames]:.1f}%
+            Temp: {temperature[frame_idx % frames]:.1f}°C
+        """))
+
+        if len(ripples) < N_RIPPLES:
+            spawn_ripple(frame_idx)
+
+        for i, r in list(enumerate(ripples)):
+            r['radius'] += 2.0 + float(rainfall[frame_idx % frames]) * 0.08
+            r['alpha'] -= FADE_RATE
+            move_dist = r['radius'] * 0.02
+            r['x'] += move_dist * np.cos(r['angle'])
+            r['y'] += move_dist * np.sin(r['angle'])
+
+            if i < len(ripple_artists):
+                art = ripple_artists[i]
+                art.center = (r['x'], r['y'])
+                art.set_radius(r['radius'])
+                art.set_alpha(max(0.0, min(1.0, r['alpha'])))
+                color_val = min(1.0, float(rainfall[frame_idx % frames]) / 30.0)
+                art.set_edgecolor(plt.cm.rainbow(color_val))
+
+        remove_indices = [i for i, r in enumerate(ripples) if r['alpha'] <= 0.0 or r['radius'] > MAX_RADIUS]
+        for idx in sorted(remove_indices, reverse=True):
+            if idx < len(ripple_artists):
+                ripple_artists[idx].remove()
+            ripples.pop(idx)
+            ripple_artists.pop(idx)
+
+        return ripple_artists + [info_text]
+
+    ani = FuncAnimation(fig, animate, frames=frames, interval=50, blit=True)
+    plt.show()
 
 
-
-# Normalize for generative art
-rain = df['rain (mm)'].astype(float).values
-frames = len(df)
-
-fig, ax = plt.subplots(figsize=(10, 10))
-ax.set_facecolor('#1a1a2e')
-ax.set_xticks([])
-ax.set_yticks([])
-ax.set_xlim(-1, 1)
-ax.set_ylim(-1, 1)
-
-# Prepare raindrop scatter
-raindrops = ax.scatter([], [], s=[], c=[], alpha=0.7)
-rain_cmap = plt.get_cmap('Blues')
-
-
-def animate(frame):
-    # Number of drops and their properties depend on rain intensity
-    n_drops = int(10 + rain[frame]*8)
-    # Raindrop positions: random x, falling y
-    x = np.random.uniform(-0.95, 0.95, n_drops)
-    y = np.linspace(1, -1, n_drops) + np.random.normal(0, 0.05, n_drops)
-    sizes = 30 + rain[frame]*20 * np.random.uniform(0.7, 1.3, n_drops)
-    colors = rain_cmap(np.clip(rain[frame]/10, 0, 1))
-    alphas = np.clip(0.3 + rain[frame]/10, 0.3, 0.9)
-    raindrops.set_offsets(np.c_[x, y])
-    raindrops.set_sizes(sizes)
-    raindrops.set_color(colors)
-    raindrops.set_alpha(alphas)
-    ax.set_title(f"Rainfall: {rain[frame]:.2f} mm", fontsize=18, color='#3a8dde')
-
-    # Display Kyoto info and real-time weather in lower right
-    kyoto_lon = float(135.7681)
-    kyoto_lat = float(35.0116)
-    print(f"DEBUG: kyoto_lon={kyoto_lon} type={type(kyoto_lon)}, kyoto_lat={kyoto_lat} type={type(kyoto_lat)}")
-    dewpoint = df['dew_point_2m (°C)'].iloc[frame]
-    humidity = df['relative_humidity_2m (%)'].iloc[frame]
-    temp = df['temperature_2m (°C)'].iloc[frame]
-    try:
-        info_text = (f"Kyoto\nLon: {kyoto_lon:.4f}\nLat: {kyoto_lat:.4f}\n"
-                     f"Temp: {temp:.1f}°C\nDewpoint: {dewpoint:.1f}°C\nRH: {humidity:.0f}%")
-    except ValueError:
-        info_text = (f"Kyoto\nLon: {str(kyoto_lon)}\nLat: {str(kyoto_lat)}\n"
-                     f"Temp: {str(temp)}°C\nDewpoint: {str(dewpoint)}°C\nRH: {str(humidity)}%")
-    # Remove previous text box if exists
-    if hasattr(ax, 'weather_box'):
-        ax.weather_box.remove()
-    ax.weather_box = ax.text(0.98, 0.02, info_text, transform=ax.transAxes,
-        fontsize=14, color='white', ha='right', va='bottom',
-        bbox=dict(facecolor='#1a1a2e', edgecolor='#3a8dde', boxstyle='round,pad=0.5', alpha=0.7))
-
-    return [raindrops, ax.weather_box]
-
-ani = FuncAnimation(fig, animate, frames=frames, interval=120, blit=True)
-plt.show()
+if __name__ == '__main__':
+    main()
