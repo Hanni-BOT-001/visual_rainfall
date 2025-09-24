@@ -1,0 +1,6 @@
+
+
+
+my_list = [85, 90, 78]
+my_list[0] = 95
+my_list.append(88)
